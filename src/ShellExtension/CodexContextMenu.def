@@ -1,0 +1,4 @@
+LIBRARY CodexContextMenu
+EXPORTS
+  DllCanUnloadNow PRIVATE
+  DllGetClassObject PRIVATE
