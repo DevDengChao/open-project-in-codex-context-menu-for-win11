@@ -137,6 +137,7 @@ Get-AppxPackage -Name OpenAI.CodexContextMenu
 - 构建时报 `MSB8020`，通常表示当前机器缺少 `v145` 平台工具集，或未安装 `Desktop development with C++`。
 - `register.ps1` 中的 `Add-AppxPackage` 报 `0x80073CFF`，通常表示未启用 Windows 开发者模式，未签名 sparse package 无法注册。
 - `ComSmoke.exe` 在注册前报 `CoCreateInstance failed: 0x80040154` 属于预期现象，因为此时 HKCU CLSID 尚未注册。
+- 已注册状态下重新跑 `build.ps1` 或 `smoke-test.ps1`，如果报找不到 `microsoft.system.package.metadata` 路径，通常表示构建脚本误删了 sparse package 根目录，而 Windows 正在维护该目录下的系统元数据。
 
 ## 实现说明
 
@@ -145,6 +146,7 @@ Get-AppxPackage -Name OpenAI.CodexContextMenu
 - `IExplorerCommand::Invoke` 从 Explorer 传入的 `IShellItemArray` 读取目录路径。
 - 启动命令从 HKCU 传统菜单注册表读取，优先读取 `Directory\Background`，再回退到 `Directory`。
 - 图标从 `Directory\Background\shell\OpenProjectInCodex` 的 `Icon` 值读取。
-- sparse package 的 manifest 在 `appx\AppxManifest.xml`，构建脚本会把 DLL、宿主 EXE、图标和 manifest 复制到 `dist\sparse-package`，再由注册脚本使用 `Add-AppxPackage -Register -ExternalLocation` 注册。
+- sparse package 的 manifest 在 `appx\AppxManifest.xml`，构建脚本会把 DLL、宿主 EXE、PNG、ICO 和 manifest 复制到 `dist\sparse-package`，再由注册脚本使用 `Add-AppxPackage -Register -ExternalLocation` 注册。
+- 经典菜单和 Win11 主菜单都不要直接依赖 `codex.exe` 取图标，当前实现统一使用 staging 目录下的 `codex-context-menu.ico`。
 
-后续调整时优先保持“当前用户注册”和“sparse package staging 目录同级放置 manifest、DLL、EXE、PNG”的约定，这样能避免 WindowsApps 版本化路径和权限问题。
+后续调整时优先保持“当前用户注册”和“sparse package staging 目录同级放置 manifest、DLL、EXE、PNG、ICO”的约定，这样能避免 WindowsApps 版本化路径和权限问题。

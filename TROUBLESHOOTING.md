@@ -163,6 +163,75 @@ reg query "HKCU\Software\Classes\CLSID\{7F07B25C-22DE-46D3-9747-6B2D6B07F54D}" /
 title=Open project in Codex
 ```
 
+### 现象：菜单已经出现，但图标不对
+
+典型现象：
+
+- 菜单文本已经能显示。
+- 但图标显示成错误图标、空白图标，或者不是预期的 Codex 图标。
+
+原因：
+
+- 经典菜单和 Win11 主菜单都会走 `Icon` 值或 `IExplorerCommand::GetIcon` 的返回值。
+- 如果这里直接指向 `codex.exe`，资源管理器未必会稳定解析出预期图标。
+- 本次验证里，更稳定的做法是使用项目自带图标资源，在 staging 目录生成独立的 `codex-context-menu.ico`，然后统一让注册表和 COM 菜单读取它。
+
+处理：
+
+1. 确认 staging 目录里存在：
+
+```powershell
+Get-Item .\dist\sparse-package\codex-context-menu.ico
+```
+
+2. 确认两个菜单键的 `Icon` 已经指向这个 `.ico` 文件：
+
+```powershell
+reg query HKCU\Software\Classes\Directory\shell\OpenProjectInCodex /v Icon
+reg query HKCU\Software\Classes\Directory\Background\shell\OpenProjectInCodex /v Icon
+```
+
+3. 重新执行注册并重启 Explorer：
+
+```powershell
+.\scripts\register.ps1 -RestartExplorer
+```
+
+补充说明：
+
+- 当前实现会从 `assets\codex-context-menu.png` 生成 `dist\sparse-package\codex-context-menu.ico`。
+- 这是为了避免继续依赖 `codex.exe` 的默认图标解析行为。
+
+### 现象：已注册状态下，`build.ps1` 或 `smoke-test.ps1` 报 `microsoft.system.package.metadata` 路径错误
+
+典型报错：
+
+```text
+Could not find a part of the path '...\dist\sparse-package\microsoft.system.package.metadata'
+```
+
+原因：
+
+- `register.ps1` 成功后，Windows 会在 `dist\sparse-package` 下维护隐藏目录 `microsoft.system.package.metadata`。
+- 如果 `build.ps1` 在下一次构建时直接整目录删除 `dist\sparse-package`，就可能和系统维护中的 sparse package 元数据目录冲突。
+- 这会让“已注册状态下重新构建”或“已注册状态下运行 `smoke-test.ps1`”变得不稳定。
+
+处理：
+
+1. 不要在已注册状态下整目录删除 `dist\sparse-package`。
+2. 改为保留 `microsoft.system.package.metadata`，只清理并重写当前项目自己生成的文件。
+3. 然后重新执行：
+
+```powershell
+.\scripts\build.ps1
+.\scripts\smoke-test.ps1
+```
+
+补充说明：
+
+- 当前仓库已经按这个方式修复：保留 sparse package 根目录和系统元数据目录，只替换 DLL、EXE、manifest、PNG、ICO 等 staging 文件。
+- 这个问题属于“已注册后再次构建”的场景，首次构建通常不会触发。
+
 ## 卸载验证
 
 执行：

@@ -17,6 +17,7 @@ $required = @(
   'AppxManifest.xml',
   'CodexContextMenu.dll',
   'CodexContextMenuHost.exe',
+  'codex-context-menu.ico',
   'codex-context-menu.png'
 )
 

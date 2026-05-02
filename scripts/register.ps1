@@ -17,6 +17,7 @@ $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $StageDir = Join-Path $Root 'dist\sparse-package'
 $Manifest = Join-Path $StageDir 'AppxManifest.xml'
 $Dll = Join-Path $StageDir 'CodexContextMenu.dll'
+$MenuIcon = Join-Path $StageDir 'codex-context-menu.ico'
 $Clsid = '{7F07B25C-22DE-46D3-9747-6B2D6B07F54D}'
 $PackageName = 'OpenAI.CodexContextMenu'
 
@@ -74,6 +75,9 @@ if (!(Test-Path -LiteralPath $Manifest)) {
 if (!(Test-Path -LiteralPath $Dll)) {
   throw "Shell extension DLL was not staged: $Dll"
 }
+if (!(Test-Path -LiteralPath $MenuIcon)) {
+  throw "Context menu icon was not staged: $MenuIcon"
+}
 
 function Set-DefaultValue {
   param(
@@ -88,17 +92,18 @@ function Set-DefaultValue {
 function Set-ContextMenuKey {
   param(
     [Parameter(Mandatory=$true)][string] $BasePath,
-    [Parameter(Mandatory=$true)][string] $Placeholder
+    [Parameter(Mandatory=$true)][string] $Placeholder,
+    [Parameter(Mandatory=$true)][string] $IconPath
   )
 
   $commandPath = Join-Path $BasePath 'command'
   Set-DefaultValue -Path $BasePath -Value 'Open project in Codex'
-  New-ItemProperty -Path $BasePath -Name 'Icon' -PropertyType String -Value $CodexCli -Force | Out-Null
+  New-ItemProperty -Path $BasePath -Name 'Icon' -PropertyType String -Value $IconPath -Force | Out-Null
   Set-DefaultValue -Path $commandPath -Value "`"$CodexCli`" app `"$Placeholder`""
 }
 
-Set-ContextMenuKey -BasePath 'HKCU:\Software\Classes\Directory\shell\OpenProjectInCodex' -Placeholder '%1'
-Set-ContextMenuKey -BasePath 'HKCU:\Software\Classes\Directory\Background\shell\OpenProjectInCodex' -Placeholder '%V'
+Set-ContextMenuKey -BasePath 'HKCU:\Software\Classes\Directory\shell\OpenProjectInCodex' -Placeholder '%1' -IconPath $MenuIcon
+Set-ContextMenuKey -BasePath 'HKCU:\Software\Classes\Directory\Background\shell\OpenProjectInCodex' -Placeholder '%V' -IconPath $MenuIcon
 
 $clsidPath = "HKCU:\Software\Classes\CLSID\$Clsid"
 $serverPath = Join-Path $clsidPath 'InProcServer32'
