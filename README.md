@@ -130,6 +130,14 @@ Get-AppxPackage -Name OpenAI.CodexContextMenu
 
 `tests\ComSmoke\ComSmoke.exe` 会通过当前 HKCU CLSID 注册创建 COM 对象，并读取菜单标题。它验证的是本机当前注册状态，不等同于自动安装。
 
+## 排障 / Troubleshooting
+
+常见问题先看这里，详细说明见 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)。
+
+- 构建时报 `MSB8020`，通常表示当前机器缺少 `v145` 平台工具集，或未安装 `Desktop development with C++`。
+- `register.ps1` 中的 `Add-AppxPackage` 报 `0x80073CFF`，通常表示未启用 Windows 开发者模式，未签名 sparse package 无法注册。
+- `ComSmoke.exe` 在注册前报 `CoCreateInstance failed: 0x80040154` 属于预期现象，因为此时 HKCU CLSID 尚未注册。
+
 ## 实现说明
 
 - COM CLSID：`{7F07B25C-22DE-46D3-9747-6B2D6B07F54D}`
