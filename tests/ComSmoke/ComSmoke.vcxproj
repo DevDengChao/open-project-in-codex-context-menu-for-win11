@@ -58,9 +58,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\ShellExtension\CodexProtocolLauncher.cpp" />
+    <ClCompile Include="..\..\src\ShellExtension\ContextMenuPathResolver.cpp" />
     <ClCompile Include="TestCreate.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>
-

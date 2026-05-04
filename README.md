@@ -77,19 +77,6 @@ Windows 11 新版右键菜单不只读取传统 `HKCU\Software\Classes\...\shell
 .\scripts\register.ps1 -RestartExplorer
 ```
 
-默认会按顺序自动发现 Codex CLI：
-
-- `-CodexCli` 显式传入的路径
-- `CODEX_CLI` 环境变量
-- `PATH` 中的 `codex.exe`
-- 当前用户 Codex Desktop 包缓存中的 `codex.exe`
-
-如果你的路径不同，可以显式指定：
-
-```powershell
-.\scripts\register.ps1 -CodexCli ".\tools\codex.exe" -RestartExplorer
-```
-
 注册后应能在以下位置看到 `Open project in Codex`：
 
 - 文件夹对象右键菜单
@@ -144,7 +131,8 @@ Get-AppxPackage -Name OpenAI.CodexContextMenu
 - COM CLSID：`{7F07B25C-22DE-46D3-9747-6B2D6B07F54D}`
 - 菜单标题：`Open project in Codex`
 - `IExplorerCommand::Invoke` 从 Explorer 传入的 `IShellItemArray` 读取目录路径。
-- 启动命令从 HKCU 传统菜单注册表读取，优先读取 `Directory\Background`，再回退到 `Directory`。
+- Win11 主菜单和经典菜单最终都会把目录转成 `codex://new?path=...` 并交给 Codex Desktop。
+- 经典菜单通过 `CodexContextMenuHost.exe "%1"` / `"%V"` 转发目录参数，避免直接调用 `codex.exe app` 时弹出控制台窗口但未稳定打开项目的问题。
 - 图标从 `Directory\Background\shell\OpenProjectInCodex` 的 `Icon` 值读取。
 - sparse package 的 manifest 在 `appx\AppxManifest.xml`，构建脚本会把 DLL、宿主 EXE、PNG、ICO 和 manifest 复制到 `dist\sparse-package`，再由注册脚本使用 `Add-AppxPackage -Register -ExternalLocation` 注册。
 - 经典菜单和 Win11 主菜单都不要直接依赖 `codex.exe` 取图标，当前实现统一使用 staging 目录下的 `codex-context-menu.ico`。

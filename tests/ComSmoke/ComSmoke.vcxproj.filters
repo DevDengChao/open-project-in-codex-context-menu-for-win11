@@ -7,9 +7,14 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\ShellExtension\CodexProtocolLauncher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\ShellExtension\ContextMenuPathResolver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="TestCreate.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
-

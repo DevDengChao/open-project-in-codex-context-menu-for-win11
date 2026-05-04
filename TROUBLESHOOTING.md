@@ -202,6 +202,56 @@ reg query HKCU\Software\Classes\Directory\Background\shell\OpenProjectInCodex /v
 - 当前实现会从 `assets\codex-context-menu.png` 生成 `dist\sparse-package\codex-context-menu.ico`。
 - 这是为了避免继续依赖 `codex.exe` 的默认图标解析行为。
 
+### 现象：点击菜单会弹出命令行窗口，但 Codex Desktop 没有打开目标目录
+
+典型现象：
+
+- 文件夹对象右键或文件夹空白处右键都能看到菜单。
+- 点击后会闪出一个命令行窗口。
+- Codex Desktop 没有打开对应目录的新项目会话。
+
+原因：
+
+- 经典菜单原先直接把注册表 `command` 指向 `codex.exe app "%1"` 或 `"%V"`。
+- 单独在终端里运行 `codex.exe app <path>` 可以成功，但在资源管理器右键场景下，这条链路并不总能稳定把目录交给 Codex Desktop。
+- Codex Desktop 的实际 Windows 深链解析逻辑支持 `codex://new?path=...`，并且它自己的 Windows 上下文菜单实现也会把“打开项目”视为“创建一个带 `path` 的 newThread”。
+
+处理：
+
+1. 不再让经典菜单直接调用 `codex.exe app`。
+2. 改为让经典菜单调用 `CodexContextMenuHost.exe "%1"` 或 `"%V"`。
+3. `CodexContextMenuHost.exe` 只负责把目录参数转换成：
+
+```text
+codex://new?path=<percent-encoded-path>
+```
+
+4. Win11 主菜单里的 `IExplorerCommand::Invoke` 也复用同一套 URI 拼接和协议启动逻辑。
+5. 重新执行：
+
+```powershell
+.\scripts\register.ps1 -RestartExplorer
+```
+
+验证：
+
+```powershell
+reg query HKCU\Software\Classes\Directory\shell\OpenProjectInCodex\command /ve
+reg query HKCU\Software\Classes\Directory\Background\shell\OpenProjectInCodex\command /ve
+```
+
+当前预期值应类似：
+
+```text
+"D:\...\dist\sparse-package\CodexContextMenuHost.exe" "%1"
+"D:\...\dist\sparse-package\CodexContextMenuHost.exe" "%V"
+```
+
+补充说明：
+
+- `codex://new?path=...` 是根据已安装 Codex Desktop 包的深链解析逻辑反查并验证过的。
+- 现在经典菜单和 Win11 主菜单都共用同一套协议启动实现，避免两边行为继续分叉。
+
 ### 现象：已注册状态下，`build.ps1` 或 `smoke-test.ps1` 报 `microsoft.system.package.metadata` 路径错误
 
 典型报错：

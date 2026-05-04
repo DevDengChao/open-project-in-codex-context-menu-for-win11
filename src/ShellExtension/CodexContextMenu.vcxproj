@@ -78,6 +78,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CodexContextMenu.cpp" />
+    <ClCompile Include="CodexProtocolLauncher.cpp" />
+    <ClCompile Include="ContextMenuPathResolver.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CodexContextMenu.def" />
@@ -85,4 +87,3 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>
-

@@ -1,10 +1,14 @@
 #include <windows.h>
 #include <shobjidl.h>
 #include <shlobj.h>
+#include <ocidl.h>
 
 #include <new>
 #include <string>
 #include <vector>
+
+#include "CodexProtocolLauncher.h"
+#include "ContextMenuPathResolver.h"
 
 namespace {
 
@@ -55,26 +59,6 @@ std::wstring QueryDefaultValue(HKEY root, const wchar_t* subkey) {
   return std::wstring(buffer.data());
 }
 
-void ReplaceAll(std::wstring& text, const std::wstring& needle, const std::wstring& replacement) {
-  size_t pos = 0;
-  while ((pos = text.find(needle, pos)) != std::wstring::npos) {
-    text.replace(pos, needle.length(), replacement);
-    pos += replacement.length();
-  }
-}
-
-std::wstring ReadCodexCommandTemplate() {
-  std::wstring value = QueryDefaultValue(
-      HKEY_CURRENT_USER,
-      L"Software\\Classes\\Directory\\Background\\shell\\OpenProjectInCodex\\command");
-  if (!value.empty()) {
-    return value;
-  }
-  return QueryDefaultValue(
-      HKEY_CURRENT_USER,
-      L"Software\\Classes\\Directory\\shell\\OpenProjectInCodex\\command");
-}
-
 std::wstring ReadCodexIconPath() {
   DWORD type = 0;
   DWORD cb = 0;
@@ -93,71 +77,9 @@ std::wstring ReadCodexIconPath() {
   }
   return value;
 }
-
-HRESULT GetPathFromSelection(IShellItemArray* selection, std::wstring& path) {
-  if (selection == nullptr) {
-    return E_INVALIDARG;
-  }
-
-  DWORD count = 0;
-  CODEX_RETURN_IF_FAILED(selection->GetCount(&count));
-  if (count == 0) {
-    return E_FAIL;
-  }
-
-  IShellItem* item = nullptr;
-  CODEX_RETURN_IF_FAILED(selection->GetItemAt(0, &item));
-
-  PWSTR filePath = nullptr;
-  HRESULT hr = item->GetDisplayName(SIGDN_FILESYSPATH, &filePath);
-  item->Release();
-  if (FAILED(hr)) {
-    return hr;
-  }
-
-  path.assign(filePath);
-  CoTaskMemFree(filePath);
-  return path.empty() ? E_FAIL : S_OK;
-}
-
-HRESULT LaunchCodexForPath(const std::wstring& path) {
-  std::wstring command = ReadCodexCommandTemplate();
-  if (command.empty()) {
-    return HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
-  }
-
-  ReplaceAll(command, L"%V", path);
-  ReplaceAll(command, L"%1", path);
-
-  STARTUPINFOW startup = {};
-  startup.cb = sizeof(startup);
-  PROCESS_INFORMATION process = {};
-
-  std::vector<wchar_t> mutableCommand(command.begin(), command.end());
-  mutableCommand.push_back(L'\0');
-
-  if (!CreateProcessW(
-          nullptr,
-          mutableCommand.data(),
-          nullptr,
-          nullptr,
-          FALSE,
-          0,
-          nullptr,
-          path.c_str(),
-          &startup,
-          &process)) {
-    return HRESULT_FROM_WIN32(GetLastError());
-  }
-
-  CloseHandle(process.hThread);
-  CloseHandle(process.hProcess);
-  return S_OK;
-}
-
-class CodexExplorerCommand final : public IExplorerCommand {
+class CodexExplorerCommand final : public IExplorerCommand, public IObjectWithSite {
  public:
-  CodexExplorerCommand() : refCount_(1) {}
+  CodexExplorerCommand() : refCount_(1), site_(nullptr) {}
 
   IFACEMETHODIMP QueryInterface(REFIID riid, void** ppv) override {
     if (ppv == nullptr) {
@@ -166,6 +88,11 @@ class CodexExplorerCommand final : public IExplorerCommand {
     *ppv = nullptr;
     if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_IExplorerCommand)) {
       *ppv = static_cast<IExplorerCommand*>(this);
+      AddRef();
+      return S_OK;
+    }
+    if (IsEqualIID(riid, IID_IObjectWithSite)) {
+      *ppv = static_cast<IObjectWithSite*>(this);
       AddRef();
       return S_OK;
     }
@@ -227,8 +154,8 @@ class CodexExplorerCommand final : public IExplorerCommand {
 
   IFACEMETHODIMP Invoke(IShellItemArray* selection, IBindCtx*) override {
     std::wstring path;
-    CODEX_RETURN_IF_FAILED(GetPathFromSelection(selection, path));
-    return LaunchCodexForPath(path);
+    CODEX_RETURN_IF_FAILED(codex::ResolveCodexTargetPath(selection, site_, path));
+    return codex::LaunchCodexForPath(path);
   }
 
   IFACEMETHODIMP GetFlags(EXPCMDFLAGS* flags) override {
@@ -246,11 +173,40 @@ class CodexExplorerCommand final : public IExplorerCommand {
     return E_NOTIMPL;
   }
 
+  IFACEMETHODIMP SetSite(IUnknown* site) override {
+    if (site_ != nullptr) {
+      site_->Release();
+      site_ = nullptr;
+    }
+    if (site != nullptr) {
+      site->AddRef();
+      site_ = site;
+    }
+    return S_OK;
+  }
+
+  IFACEMETHODIMP GetSite(REFIID riid, void** ppvSite) override {
+    if (ppvSite == nullptr) {
+      return E_POINTER;
+    }
+    *ppvSite = nullptr;
+    if (site_ == nullptr) {
+      return E_FAIL;
+    }
+    return site_->QueryInterface(riid, ppvSite);
+  }
+
  private:
-  ~CodexExplorerCommand() = default;
+  ~CodexExplorerCommand() {
+    if (site_ != nullptr) {
+      site_->Release();
+      site_ = nullptr;
+    }
+  }
 
   ModuleRef moduleRef_;
   long refCount_;
+  IUnknown* site_;
 };
 
 class ClassFactory final : public IClassFactory {
